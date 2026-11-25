@@ -80,7 +80,14 @@ enum class SeamPosition : uint8_t {
 enum class SupportType : uint8_t {
     None = 0,
     NormalGrid = 1,
-    OrganicTree = 2
+    OrganicTree = 2,
+    NormalSnug = 3
+};
+
+enum class FuzzySkinMode : uint8_t {
+    None = 0,
+    Outside = 1,
+    AllWalls = 2
 };
 
 enum class SupportPlacement : uint8_t {
@@ -167,6 +174,11 @@ struct SlicerConfig {
     float xy_contour_comp = 0.0f;           // positive expands outer walls
     float xy_hole_comp = 0.0f;              // positive widens holes
     bool spiral_vase = false;
+    FuzzySkinMode fuzzy_skin = FuzzySkinMode::None;
+    float fuzzy_skin_thickness = 0.30f;     // mm lateral perturbation
+    float fuzzy_skin_point_dist = 0.80f;    // mm sampling pitch along outer wall
+    float small_perimeter_speed = 28.0f;    // mm/s for small holes/pins
+    float small_perimeter_radius = 6.5f;    // mm equivalent radius threshold (0 = off)
     float simplify_tolerance = 0.012f;      // Douglas-Peucker resolution (mm)
 
     // --- Top / Bottom / Ironing / Bridging ---
@@ -201,6 +213,7 @@ struct SlicerConfig {
     float support_interface_density = 75.0f;
     float tree_branch_diameter = 2.4f;
     float tree_max_branch_angle = 45.0f;
+    bool support_brim = true;
 
     // --- Bed Adhesion ---
     AdhesionType adhesion = AdhesionType::Skirt;
@@ -272,6 +285,9 @@ struct SlicerConfig {
     float classic_jerk = 8.0f;              // Marlin Classic Jerk (mm/s)
 
     // --- Performance & Output ---
+    std::vector<int> pause_layers;          // 0-based layer indices to insert M600 / PAUSE
+    std::string custom_start_gcode;
+    std::string custom_end_gcode;
     int threads = 0;                        // 0 = auto (hardware_concurrency)
     bool enable_layer_cache = true;
     bool emit_gcode = true;

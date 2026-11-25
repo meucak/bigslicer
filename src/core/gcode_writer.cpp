@@ -251,6 +251,27 @@ std::string build_header_and_start_gcode(const SlicerConfig& cfg, const SliceSta
         out += "G1 X5.4 Y10 Z0.3 F1500 E10\n";
         out += "G92 E0\n";
     }
+    // Optional User Custom Start G-Code (replaces {nozzle_temp}, {bed_temp}, {first_layer_nozzle_temp}, {first_layer_bed_temp})
+    if (!cfg.custom_start_gcode.empty()) {
+        auto repl = [](std::string& s, const char* pat, float val) {
+            char nb[32];
+            std::snprintf(nb, sizeof(nb), "%.0f", val);
+            size_t p = 0, plen = std::strlen(pat);
+            while ((p = s.find(pat, p)) != std::string::npos) {
+                s.replace(p, plen, nb);
+                p += std::strlen(nb);
+            }
+        };
+        std::string custom = cfg.custom_start_gcode;
+        repl(custom, "{nozzle_temp}", cfg.nozzle_temp);
+        repl(custom, "{bed_temp}", cfg.bed_temp);
+        repl(custom, "{first_layer_nozzle_temp}", cfg.first_layer_nozzle_temp);
+        repl(custom, "{first_layer_bed_temp}", cfg.first_layer_bed_temp);
+        out += "; --- CUSTOM START G-CODE ---\n";
+        out += custom;
+        if (!custom.empty() && custom.back() != '\n') out.push_back('\n');
+    }
+
     out += "M107 ; fan off for first layer\n\n";
     return out;
 }
@@ -259,6 +280,11 @@ std::string build_end_gcode(const SlicerConfig& cfg, float max_z) {
     std::string out;
     out.reserve(512);
     out += "\n; --- END G-CODE ---\n";
+    if (!cfg.custom_end_gcode.empty()) {
+        out += "; --- CUSTOM END G-CODE ---\n";
+        out += cfg.custom_end_gcode;
+        if (cfg.custom_end_gcode.back() != '\n') out.push_back('\n');
+    }
     if (cfg.retract_length > 1e-4f) {
         out += cfg.relative_extrusion ? "G1 E-" : "G91\nG1 E-";
         append_fixed(out, cfg.retract_length, 3);
@@ -311,6 +337,19 @@ void serialize_layer_chunk(const std::vector<PlannedLayer>& layers,
         out += "\n;HEIGHT:";
         append_fixed(out, ly.height, 3);
         out.push_back('\n');
+
+        // Optional Pause at Layer (M600 / PAUSE for filament change or magnet insertion!)
+        if (!cfg.pause_layers.empty() &&
+            std::binary_search(cfg.pause_layers.begin(), cfg.pause_layers.end(), static_cast<int>(ly.index))) {
+            out += "; PAUSE AT LAYER ";
+            append_uint(out, ly.index);
+            out += "\n";
+            if (cfg.flavor == GCodeFlavor::Klipper) {
+                out += "PAUSE\n";
+            } else {
+                out += "M600 ; filament change / pause\n";
+            }
+        }
 
         // Transition temperatures on Layer 1
         if (ly.index == 1) {

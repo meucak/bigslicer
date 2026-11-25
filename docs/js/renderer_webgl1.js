@@ -702,6 +702,13 @@ export class RendererWebGL1 {
 
     if (isPreview) {
       this._drawToolpathWebGL1(vp, state);
+    } else if (state.gizmoLines && state.gizmoLines.length >= 14) {
+      gl.disable(gl.DEPTH_TEST);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      this._drawLines(state.gizmoLines, (state.gizmoLines.length / 7) | 0, vp);
+      gl.disable(gl.BLEND);
+      gl.enable(gl.DEPTH_TEST);
     }
 
     // 2. Ground Grid (line-based)

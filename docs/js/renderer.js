@@ -180,6 +180,7 @@ uniform int uColorMode;
 uniform float uRangeMin;
 uniform float uRangeMax;
 uniform int uHighlightFeature;
+uniform int uHiddenMask;
 uniform vec3 uFeatureColors[13];
 
 out vec3 vNormal;
@@ -221,6 +222,14 @@ void main() {
 
   int meta = int(aFlowMeta.y + 0.5);
   int ftype = clamp(meta & 255, 0, 12);
+
+  if ((uHiddenMask & (1 << ftype)) != 0) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    vNormal = vec3(0.0, 0.0, 1.0);
+    vColor = vec3(0.0);
+    vDim = 0.0;
+    return;
+  }
 
   if (uColorMode == 0) {
     vColor = uFeatureColors[ftype];
@@ -310,6 +319,7 @@ const BED_FS = `#version 300 es
 precision highp float;
 precision highp int;
 in vec3 vWorld;
+uniform vec2 uBedMin;
 uniform vec2 uBedSize;
 uniform int uDark;
 out vec4 FragColor;
@@ -321,7 +331,7 @@ float gridLine(vec2 coord, float spacing) {
 }
 
 void main() {
-  vec2 p = vWorld.xy;
+  vec2 p = vWorld.xy - uBedMin;
   if (p.x < 0.0 || p.y < 0.0 || p.x > uBedSize.x || p.y > uBedSize.y) discard;
 
   float minor = gridLine(p, 10.0);
@@ -513,6 +523,7 @@ export class Renderer {
     this.uTpRangeMin = gl.getUniformLocation(this.tpProg, 'uRangeMin');
     this.uTpRangeMax = gl.getUniformLocation(this.tpProg, 'uRangeMax');
     this.uTpHighlight = gl.getUniformLocation(this.tpProg, 'uHighlightFeature');
+    this.uTpHiddenMask = gl.getUniformLocation(this.tpProg, 'uHiddenMask');
     this.uTpFeatColors = gl.getUniformLocation(this.tpProg, 'uFeatureColors');
 
     // Upload static feature palette once
@@ -535,6 +546,7 @@ export class Renderer {
 
     this.bedProg = compileProgram(gl, BED_VS, BED_FS, 'bed');
     this.uBedVP = gl.getUniformLocation(this.bedProg, 'uVP');
+    this.uBedMin = gl.getUniformLocation(this.bedProg, 'uBedMin');
     this.uBedSize = gl.getUniformLocation(this.bedProg, 'uBedSize');
     this.uBedDark = gl.getUniformLocation(this.bedProg, 'uDark');
 
@@ -766,24 +778,29 @@ export class Renderer {
       const bx = state.bedX || 220;
       const by = state.bedY || 220;
       const bz = state.bedZ || 250;
+      const bMinX = state.originCenter ? -bx * 0.5 : 0;
+      const bMinY = state.originCenter ? -by * 0.5 : 0;
+      const bMaxX = bMinX + bx;
+      const bMaxY = bMinY + by;
 
-      // 2. Printer Build Plate Surface (exact bedX x bedY at Z=0!)
+      // 2. Printer Build Plate Surface (exact bedX x bedY at Z=0, supports Delta origin_center!)
       if (state.showGrid) {
         const bq = this.bedScratch;
         const gz = -0.04;
         bq.set([
-          0, 0, gz, 0, 0, 0, 0,
-          bx, 0, gz, 0, 0, 0, 0,
-          bx, by, gz, 0, 0, 0, 0,
-          0, 0, gz, 0, 0, 0, 0,
-          bx, by, gz, 0, 0, 0, 0,
-          0, by, gz, 0, 0, 0, 0,
+          bMinX, bMinY, gz, 0, 0, 0, 0,
+          bMaxX, bMinY, gz, 0, 0, 0, 0,
+          bMaxX, bMaxY, gz, 0, 0, 0, 0,
+          bMinX, bMinY, gz, 0, 0, 0, 0,
+          bMaxX, bMaxY, gz, 0, 0, 0, 0,
+          bMinX, bMaxY, gz, 0, 0, 0, 0,
         ]);
         gl.disable(gl.CULL_FACE);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.useProgram(this.bedProg);
         gl.uniformMatrix4fv(this.uBedVP, false, vp);
+        gl.uniform2f(this.uBedMin, bMinX, bMinY);
         gl.uniform2f(this.uBedSize, bx, by);
         gl.uniform1i(this.uBedDark, state.darkTheme ? 1 : 0);
         gl.bindVertexArray(this.lineVao);
@@ -796,10 +813,10 @@ export class Renderer {
         const cc = state.darkTheme ? [0.24, 0.44, 0.78, 0.28] : [0.14, 0.30, 0.65, 0.28];
         const cage = [];
         const seg = (a, b) => cage.push(a[0], a[1], a[2], ...cc, b[0], b[1], b[2], ...cc);
-        seg([0, 0, 0], [0, 0, bz]); seg([bx, 0, 0], [bx, 0, bz]);
-        seg([bx, by, 0], [bx, by, bz]); seg([0, by, 0], [0, by, bz]);
-        seg([0, 0, bz], [bx, 0, bz]); seg([bx, 0, bz], [bx, by, bz]);
-        seg([bx, by, bz], [0, by, bz]); seg([0, by, bz], [0, 0, bz]);
+        seg([bMinX, bMinY, 0], [bMinX, bMinY, bz]); seg([bMaxX, bMinY, 0], [bMaxX, bMinY, bz]);
+        seg([bMaxX, bMaxY, 0], [bMaxX, bMaxY, bz]); seg([bMinX, bMaxY, 0], [bMinX, bMaxY, bz]);
+        seg([bMinX, bMinY, bz], [bMaxX, bMinY, bz]); seg([bMaxX, bMinY, bz], [bMaxX, bMaxY, bz]);
+        seg([bMaxX, bMaxY, bz], [bMinX, bMaxY, bz]); seg([bMinX, bMaxY, bz], [bMinX, bMinY, bz]);
         if (this.lineScratch.length < cage.length) this.lineScratch = new Float32Array(cage.length);
         this.lineScratch.set(cage);
         gl.enable(gl.BLEND);
@@ -841,6 +858,11 @@ export class Renderer {
           gl.uniform1f(this.uTpRangeMin, rmin);
           gl.uniform1f(this.uTpRangeMax, rmax);
           gl.uniform1i(this.uTpHighlight, state.highlightFeature ?? -1);
+          let hiddenMask = 0;
+          if (state.hiddenFeatures) {
+            for (const id of state.hiddenFeatures) hiddenMask |= (1 << (id | 0));
+          }
+          gl.uniform1i(this.uTpHiddenMask, hiddenMask);
 
           gl.bindVertexArray(this.tpVao);
           // Rebind instance pointers shifted by startInst * 40 bytes (zero buffer re-upload!)
@@ -904,6 +926,37 @@ export class Renderer {
             gl.drawArrays(gl.LINES, 0, (nv.length / 7) | 0);
           }
         }
+
+        // Optional Z-Seam / Retraction Cross Markers on Active Layer
+        if (state.showSeams && tp.travelTotal > 0) {
+          const sv = [];
+          const tr = tp.travelInstances;
+          const tEnd = topLy.travelFirst + topLy.travelCount;
+          const r = 0.85;
+          const sc = [0.88, 0.65, 1.0, 0.95];
+          const addCross = (x, y, z) => {
+            sv.push(x - r, y, z, ...sc, x + r, y, z, ...sc);
+            sv.push(x, y - r, z, ...sc, x, y + r, z, ...sc);
+            sv.push(x, y, z - r * 0.6, ...sc, x, y, z + r * 1.4, ...sc);
+          };
+          for (let k = topLy.travelFirst; k < tEnd && sv.length < 36000; k++) {
+            const sb = k * 10;
+            const flags = ((tr[sb + 9] | 0) >> 8) & 255;
+            if (flags & 4) addCross(tr[sb], tr[sb + 1], tr[sb + 4] + 0.08);
+          }
+          if (sv.length > 0) {
+            if (this.lineScratch.length < sv.length) this.lineScratch = new Float32Array(sv.length);
+            this.lineScratch.set(sv);
+            gl.disable(gl.DEPTH_TEST);
+            gl.useProgram(this.lineProg);
+            gl.uniformMatrix4fv(this.uLineVP, false, vp);
+            gl.bindVertexArray(this.lineVao);
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.lineVbo);
+            gl.bufferData(gl.ARRAY_BUFFER, this.lineScratch.subarray(0, sv.length), gl.STREAM_DRAW);
+            gl.drawArrays(gl.LINES, 0, (sv.length / 7) | 0);
+            gl.enable(gl.DEPTH_TEST);
+          }
+        }
       }
 
       // 4. STL Mesh (solid in Prepare mode, or optional translucent Ghost Shell in Preview mode!)
@@ -954,6 +1007,24 @@ export class Renderer {
           gl.drawArrays(gl.TRIANGLES, 0, mesh.triCount * 3);
         }
         gl.disable(gl.CULL_FACE);
+      }
+
+      // 4.5. Interactive 3D Transform Gizmo & Out-Of-Bounds Warning Box (Prepare Mode!)
+      if (!inPreview && state.gizmoLines && state.gizmoLines.length >= 14) {
+        const glines = state.gizmoLines;
+        if (this.lineScratch.length < glines.length) this.lineScratch = new Float32Array(glines.length);
+        this.lineScratch.set(glines);
+        gl.disable(gl.DEPTH_TEST);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.useProgram(this.lineProg);
+        gl.uniformMatrix4fv(this.uLineVP, false, vp);
+        gl.bindVertexArray(this.lineVao);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.lineVbo);
+        gl.bufferData(gl.ARRAY_BUFFER, this.lineScratch.subarray(0, glines.length), gl.STREAM_DRAW);
+        gl.drawArrays(gl.LINES, 0, (glines.length / 7) | 0);
+        gl.disable(gl.BLEND);
+        gl.enable(gl.DEPTH_TEST);
       }
 
       // 5. Progressive SSAA Accumulation

@@ -1,7 +1,10 @@
 export const DEMO_MODELS = Object.freeze([
   { id: 'flange-housing', name: 'flange-housing.stl', label: 'Flange Housing' },
+  { id: 'overhang-arch', name: 'overhang-arch.stl', label: 'Overhang & Support Arch' },
   { id: 'spur-gear', name: 'spur-gear.stl', label: 'Spur Gear (18T)' },
   { id: 'calibration-block', name: 'calibration-block.stl', label: 'Calibration Block' },
+  { id: 'temp-tower', name: 'overhang-bridge-tower.stl', label: 'Calibration: Overhang & Bridge Tower' },
+  { id: 'retraction-pillars', name: 'retraction-pillars.stl', label: 'Calibration: Retraction Pillars' },
 ]);
 
 export function buildBinaryStl(triangles, headerLabel = 'stlviewer procedural CAD') {
@@ -274,8 +277,65 @@ function makeCalibrationBlock() {
   return buildBinaryStl(out, 'stlviewer calibration-block.stl');
 }
 
+function makeOverhangArch() {
+  const out = [];
+  // Twin grounded pillars + 28mm elevated horizontal bridge deck + cantilevered 18mm balcony
+  // Ideal showcase for Organic Tree, Normal Grid & Normal Snug supports!
+  addBox(out, -28, -12, 0, -12, 12, 22);
+  addBox(out,  12, -12, 0,  28, 12, 22);
+  // Top deck spanning across both pillars (24mm clear span under Z=21.6)
+  addBox(out, -30, -13, 21.6, 30, 13, 29);
+  // Side cantilevered balcony at Z=14..20 (pure overhang requiring supports!)
+  addBox(out, 27.6, -9, 14, 44, 9, 20);
+  // Top alignment boss
+  addWasherStack(out, 32, [[3.5, 28.6], [8.5, 28.6], [8.5, 35.0], [7.5, 36.0], [3.5, 36.0]], 0, 0);
+  return buildBinaryStl(out, 'bigslicer overhang-arch.stl');
+}
+
+function makeTempOverhangTower() {
+  const out = [];
+  // OrcaSlicer-inspired stepped overhang & bridge calibration tower (4 tiers)
+  addBox(out, -24, -10, 0, 24, 10, 3);
+  for (let tier = 0; tier < 4; tier++) {
+    const z0 = 2.8 + tier * 10;
+    const z1 = z0 + 10.2;
+    // Left & right columns
+    addBox(out, -20, -7, z0, -10, 7, z1);
+    addBox(out,  10, -7, z0,  20, 7, z1);
+    // Top bridge beam connecting columns
+    addBox(out, -10.3, -5, z1 - 2.6, 10.3, 5, z1);
+    // Progressive right overhang wing (6mm -> 12mm)
+    const reach = 6 + tier * 2.2;
+    addBox(out, 19.7, -5, z1 - 3.0, 20 + reach, 5, z1);
+  }
+  return buildBinaryStl(out, 'bigslicer overhang-bridge-tower.stl');
+}
+
+function makeRetractionPillars() {
+  const out = [];
+  // Flat base plate + twin slender tapered spires 32mm apart for retraction/stringing tuning
+  addBox(out, -24, -8, 0, 24, 8, 2.4);
+  const spire = [
+    [0.0, 2.2],
+    [5.2, 2.2],
+    [3.8, 12.0],
+    [2.6, 22.0],
+    [1.6, 32.0],
+    [0.0, 34.0],
+  ];
+  addWasherStack(out, 28, spire, -16, 0);
+  addWasherStack(out, 28, spire,  16, 0);
+  return buildBinaryStl(out, 'bigslicer retraction-pillars.stl');
+}
+
 export function generateDemoStl(id) {
   switch (id) {
+    case 'overhang-arch':
+      return makeOverhangArch();
+    case 'temp-tower':
+      return makeTempOverhangTower();
+    case 'retraction-pillars':
+      return makeRetractionPillars();
     case 'spur-gear':
       return makeSpurGear();
     case 'calibration-block':

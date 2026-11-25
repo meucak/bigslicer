@@ -189,6 +189,77 @@ void run_test_gcode_e2e() {
         std::string pj = katman::presets_to_json();
         KT_CHECK(pj.find("voron_24_300") != std::string::npos && pj.find("tpu95a") != std::string::npos,
                  "Presets JSON exposes all built-in profiles");
+        KT_CHECK(katman::list_printer_presets().size() >= 120, "Has 120+ real printer presets");
+        KT_CHECK(katman::list_material_presets().size() >= 16, "Has 16+ real material presets");
+        KT_CHECK(katman::list_quality_presets().size() >= 7, "Has 7+ quality presets");
+
+        // Verify legendary classic printers & Delta origin_center
+        katman::SlicerConfig e3p{};
+        KT_CHECK(katman::apply_printer_preset(e3p, "creality_ender3_pro") &&
+                 e3p.bed_size_x == 220.0f && e3p.retract_length >= 4.0f,
+                 "Creality Ender-3 Pro Bowden classic preset loads cleanly");
+        katman::SlicerConfig a8{};
+        KT_CHECK(katman::apply_printer_preset(a8, "anet_a8") && a8.bed_size_z == 240.0f,
+                 "Anet A8 classic preset loads cleanly");
+        katman::SlicerConfig delta{};
+        KT_CHECK(katman::apply_printer_preset(delta, "flsun_v400") && delta.origin_center,
+                 "FLSUN V400 Delta sets origin_center=true");
+    }
+
+    // 4. BigSlicer v2.0 Pro Features: Fuzzy Skin, Small Perimeter Slowdown, Snug Support, Pause M600/PAUSE, Custom G-Code, Pos Offset
+    {
+        std::vector<RawTri> btris;
+        add_box(btris, 0, 0, 0, 24, 24, 8);
+        auto box = build_binary_stl(btris);
+        katman::SlicerConfig c_plain{};
+        c_plain.adhesion = katman::AdhesionType::None;
+        c_plain.infill_density = 0.0f;
+        auto r_plain = katman::slice_memory(box.data(), box.size(), "plain.stl", c_plain);
+
+        katman::SlicerConfig c_fuzzy = c_plain;
+        c_fuzzy.fuzzy_skin = katman::FuzzySkinMode::Outside;
+        c_fuzzy.fuzzy_skin_thickness = 0.35f;
+        c_fuzzy.fuzzy_skin_point_dist = 0.80f;
+        c_fuzzy.pause_layers = {5, 12};
+        c_fuzzy.custom_start_gcode = "M117 BigSlicer {nozzle_temp}C";
+        c_fuzzy.custom_end_gcode = "M300 S440 P200 ; done beep";
+        c_fuzzy.pos_x = 35.0f;
+        c_fuzzy.pos_y = -25.0f;
+        auto r_fuzzy = katman::slice_memory(box.data(), box.size(), "fuzzy.stl", c_fuzzy);
+
+        KT_CHECK(r_fuzzy.ok && r_fuzzy.stats.extrusion_moves > r_plain.stats.extrusion_moves * 2,
+                 "Fuzzy skin subdivides & perturbs outer perimeter cleanly");
+        KT_CHECK(r_fuzzy.gcode.find("M600") != std::string::npos, "Pause at layer emits M600 for Marlin2");
+        KT_CHECK(r_fuzzy.gcode.find("M117 BigSlicer 210C") != std::string::npos, "Custom start G-code replaces {nozzle_temp}");
+        KT_CHECK(r_fuzzy.gcode.find("M300 S440 P200") != std::string::npos, "Custom end G-code appended cleanly");
+
+        // Verify pos_x=+35, pos_y=-25 actually shifted toolpath center from (110,110) to (145,85)!
+        double sum_x = 0, sum_y = 0;
+        size_t cnt = 0;
+        for (const auto& m : r_fuzzy.planned_layers[2].moves) {
+            if (m.type == katman::FeatureType::OuterWall) { sum_x += m.x1; sum_y += m.y1; ++cnt; }
+        }
+        KT_CHECK(cnt > 10, "Has shifted outer wall moves");
+        KT_CHECK_NEAR(sum_x / cnt, 145.0, 2.0, "pos_x=+35 shifts sliced X center to 145mm");
+        KT_CHECK_NEAR(sum_y / cnt, 85.0, 2.0, "pos_y=-25 shifts sliced Y center to 85mm");
+
+        // Klipper PAUSE + NormalSnug Support on Overhang Arch
+        std::vector<RawTri> atris;
+        add_box(atris, 0, 0, 0, 10, 14, 14);
+        add_box(atris, 34, 0, 0, 44, 14, 14);
+        add_box(atris, 0, 0, 13.8f, 44, 14, 18);
+        auto arch = build_binary_stl(atris);
+        katman::SlicerConfig c_snug{};
+        katman::apply_printer_preset(c_snug, "voron_24_300");
+        c_snug.support_type = katman::SupportType::NormalSnug;
+        c_snug.support_brim = true;
+        c_snug.pause_layers = {10};
+        auto r_snug = katman::slice_memory(arch.data(), arch.size(), "arch_snug.stl", c_snug);
+        KT_CHECK(r_snug.ok &&
+                 r_snug.stats.feature_filament_mm[static_cast<size_t>(katman::FeatureType::Support)] > 10.0 &&
+                 r_snug.stats.feature_filament_mm[static_cast<size_t>(katman::FeatureType::SupportInterface)] > 5.0,
+                 "NormalSnug support generates both support body & interface layers");
+        KT_CHECK(r_snug.gcode.find("PAUSE\n") != std::string::npos, "Klipper flavor emits PAUSE for pause_layers");
     }
 
     // 3. Real-world user CAD STLs (mounted at /test_stls inside Docker or /home/kasa/mnt/toshi/3d on host)

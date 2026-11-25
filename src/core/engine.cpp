@@ -79,7 +79,7 @@ SliceResult slice_mesh(Mesh mesh, const SlicerConfig& cfg, ThreadPool* external_
     auto t4 = Clock::now();
     std::vector<int> cache_source(L, -1);
     uint32_t cached_count = 0;
-    if (cfg.enable_layer_cache && L >= 4) {
+    if (cfg.enable_layer_cache && cfg.fuzzy_skin == FuzzySkinMode::None && L >= 4) {
         for (size_t i = 2; i < L; ++i) {
             if (!layers[i].contours.empty() &&
                 layers[i].geom_hash != 0 &&

@@ -173,6 +173,54 @@ void extract_arachne_medial_paths(const Paths64& thin_regions,
     }
 }
 
+// Deterministic splitmix64 PRNG for repeatable Fuzzy Skin texture (1T == 4T bit-identical!)
+inline double fuzzy_noise_signed(uint64_t seed) {
+    seed += 0x9e3779b97f4a7c15ull;
+    seed = (seed ^ (seed >> 30)) * 0xbf58476d1ce4e5b9ull;
+    seed = (seed ^ (seed >> 27)) * 0x94d049bb133111ebull;
+    seed ^= (seed >> 31);
+    return (static_cast<double>(seed & 0xffffffull) / static_cast<double>(0xffffffull)) * 2.0 - 1.0;
+}
+
+// PrusaSlicer / Cura / OrcaSlicer style Fuzzy Skin: resample outer wall at point_dist
+// and laterally displace each sample along outward local normal by +/- thickness
+Path64 apply_fuzzy_skin_path(const Path64& poly, uint32_t layer_idx,
+                             double point_dist_mm, double thickness_mm) {
+    const size_t n = poly.size();
+    if (n < 3 || point_dist_mm < 0.1 || thickness_mm < 0.02) return poly;
+    Path64 out;
+    out.reserve(n * 3);
+    const double thick_c = thickness_mm * COORD_SCALE;
+    uint64_t sample_idx = 0;
+
+    for (size_t i = 0; i < n; ++i) {
+        const Pt64& a = poly[i];
+        const Pt64& b = poly[(i + 1) % n];
+        double dx = static_cast<double>(b.x - a.x);
+        double dy = static_cast<double>(b.y - a.y);
+        double len_mm = std::hypot(dx, dy) * INV_COORD_SCALE;
+        if (len_mm < 1e-5) continue;
+        // Outward normal for CCW outer contour is (dy, -dx) / len
+        double inv_l = 1.0 / std::hypot(dx, dy);
+        double nx = dy * inv_l;
+        double ny = -dx * inv_l;
+
+        int steps = std::max(1, static_cast<int>(std::round(len_mm / point_dist_mm)));
+        for (int s = 0; s < steps; ++s) {
+            double t = static_cast<double>(s) / static_cast<double>(steps);
+            double px = static_cast<double>(a.x) + dx * t;
+            double py = static_cast<double>(a.y) + dy * t;
+            uint64_t key = (static_cast<uint64_t>(layer_idx) << 32) ^
+                           (static_cast<uint64_t>(sample_idx++) * 0x517cc1b727220a95ull) ^
+                           static_cast<uint64_t>(a.x ^ (a.y << 13));
+            double off = fuzzy_noise_signed(key) * thick_c;
+            out.emplace_back(static_cast<int64_t>(std::llround(px + nx * off)),
+                             static_cast<int64_t>(std::llround(py + ny * off)));
+        }
+    }
+    return (out.size() >= 3) ? out : poly;
+}
+
 ExtrusionPath path64_to_extrusion(const Path64& poly, FeatureType type,
                                   float width_mm, float speed_mm_s,
                                   const SlicedLayer* prev_layer,
@@ -182,7 +230,19 @@ ExtrusionPath path64_to_extrusion(const Path64& poly, FeatureType type,
     ep.type = type;
     ep.closed = true;
     ep.nominal_width_mm = width_mm;
-    ep.nominal_speed_mm_s = speed_mm_s;
+
+    // Small Perimeter Slowdown (PrusaSlicer / OrcaSlicer): slow down tiny holes & bosses
+    float eff_speed = speed_mm_s;
+    if (cfg.small_perimeter_radius > 0.1f && poly.size() >= 3) {
+        double perim_mm = 0.0;
+        const size_t n = poly.size();
+        for (size_t i = 0, j = n - 1; i < n; j = i++) perim_mm += dist_pt_mm(poly[j], poly[i]);
+        constexpr double TWO_PI = 6.283185307179586;
+        if (perim_mm <= TWO_PI * static_cast<double>(cfg.small_perimeter_radius)) {
+            eff_speed = std::min(eff_speed, cfg.small_perimeter_speed);
+        }
+    }
+    ep.nominal_speed_mm_s = eff_speed;
     ep.pts.reserve(poly.size());
 
     bool any_overhang = false;
@@ -192,7 +252,7 @@ ExtrusionPath path64_to_extrusion(const Path64& poly, FeatureType type,
 
     for (size_t i = 0; i < poly.size(); ++i) {
         const Pt64& p = poly[i];
-        float pt_speed = speed_mm_s;
+        float pt_speed = eff_speed;
         uint8_t flags = 0;
 
         if (do_ov) {
@@ -260,10 +320,18 @@ LayerPerimeters generate_layer_perimeters(const SlicedLayer& layer,
     res.outer_wall_polys = cur;
 
     const bool check_ov = !is_first && prev_layer && (prev_layer->geom_hash != layer.geom_hash);
+    const bool do_fuzzy = !is_first && cfg.fuzzy_skin != FuzzySkinMode::None;
     for (const auto& p : cur) {
         if (p.size() < 3) continue;
-        res.outer_walls.push_back(
-            path64_to_extrusion(p, FeatureType::OuterWall, w_outer, sp_outer, prev_layer, cfg, check_ov));
+        bool fuzzy_this = do_fuzzy && (cfg.fuzzy_skin == FuzzySkinMode::AllWalls || Clipper2Lib::Area(p) > 0.0);
+        if (fuzzy_this) {
+            Path64 fp = apply_fuzzy_skin_path(p, layer.index, cfg.fuzzy_skin_point_dist, cfg.fuzzy_skin_thickness);
+            res.outer_walls.push_back(
+                path64_to_extrusion(fp, FeatureType::OuterWall, w_outer, sp_outer, prev_layer, cfg, check_ov));
+        } else {
+            res.outer_walls.push_back(
+                path64_to_extrusion(p, FeatureType::OuterWall, w_outer, sp_outer, prev_layer, cfg, check_ov));
+        }
     }
 
     auto total_perim_len_mm = [](const Paths64& ps) {
