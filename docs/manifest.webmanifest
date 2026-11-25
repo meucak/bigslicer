@@ -1,0 +1,12 @@
+{
+  "name": "Katman — Ultra-Optimized 3D Slicer",
+  "short_name": "Katman",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0e1117",
+  "theme_color": "#0e1117",
+  "description": "High-performance C++20 & Clipper2 3D printing slicer with WebGL2 instanced filament preview.",
+  "icons": [
+    { "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

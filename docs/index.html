@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#0e1117" />
+  <meta name="description" content="Katman — C++20 &amp; Clipper2 tabanlı ultra-optimize 3D baskı dilimleyici ve WebGL2 filament önizleme stüdyosu." />
+  <title>Katman — Ultra Optimize 3D Dilimleyici</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body class="theme-dark">
+  <main class="viewport-stage">
+    <h1 id="sr-heading" class="sr-only">Katman 3D Baskı Dilimleyici ve Stüdyo</h1>
+    <canvas id="gl-canvas" aria-label="3D Build Plate and Toolpath Viewport"></canvas>
+  </main>
+
+  <div id="hud-layer">
+    <!-- Top Floating Bar -->
+    <header class="hud-top" aria-label="Üst Kontrol Çubuğu">
+      <div class="top-left">
+        <div class="glass-pill info-pill">
+          <button id="btn-model-menu" class="model-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="model-popover">
+            <img src="./favicon.svg" alt="" class="brand-mark" width="20" height="20" />
+            <span class="brand-word">Katman</span>
+            <span class="sep" aria-hidden="true"></span>
+            <span id="info-name" class="info-name">flange-housing.stl</span>
+            <svg class="chev" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+              <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <span class="sep desktop-only" aria-hidden="true"></span>
+          <span id="info-metrics" class="info-metrics mono desktop-only">—</span>
+        </div>
+
+        <!-- Model Hub Popover -->
+        <div id="model-popover" class="glass-popover model-popover hidden" role="dialog" aria-label="Model Merkezi">
+          <button id="btn-open-file" class="pop-action-btn" type="button">
+            <span data-i18n="openFile">Yerel .stl / .obj / .zip Aç…</span>
+            <kbd>O</kbd>
+          </button>
+          <div id="kasa-lib-section" class="hidden">
+            <div class="pop-divider"></div>
+            <div class="pop-head">
+              <span class="pop-label" data-i18n="secKasaLib">Kasa STL Arşivi</span>
+              <span id="kasa-lib-count" class="pop-badge mono">0</span>
+            </div>
+            <input id="lib-search" class="text-input" type="search" placeholder="Model ara…" aria-label="Arşivde model ara" />
+            <div id="kasa-lib-list" class="pop-list"></div>
+          </div>
+          <div class="pop-divider"></div>
+          <div class="pop-label" data-i18n="secSamples">Yerleşik CAD Modelleri</div>
+          <div id="demo-list" class="pop-list"></div>
+        </div>
+      </div>
+
+      <!-- Center Mode Switch: Prepare | Preview -->
+      <div class="top-center">
+        <div class="glass-pill mode-pill" role="tablist" aria-label="Çalışma Modu">
+          <button id="btn-mode-prepare" class="mode-tab active" type="button" role="tab" aria-selected="true" data-i18n="modePrepare">Hazırla</button>
+          <button id="btn-mode-preview" class="mode-tab" type="button" role="tab" aria-selected="false" disabled data-i18n="modePreview">Önizleme</button>
+        </div>
+      </div>
+
+      <!-- Top Right Status & Controls -->
+      <div class="top-right">
+        <div class="glass-pill status-pill">
+          <span id="engine-dot" class="engine-dot" aria-hidden="true"></span>
+          <span id="engine-badge" class="mono engine-text">C++20</span>
+          <span class="sep" aria-hidden="true"></span>
+          <button id="btn-theme" class="chip-btn" type="button" title="Tema Değiştir (T)" data-i18n="themeToggle">Tema</button>
+          <button id="btn-lang" class="chip-btn mono" type="button" title="Dil (TR / EN)">TR</button>
+          <button id="btn-dock-toggle" class="chip-btn mobile-only" type="button" aria-expanded="true" aria-controls="slicer-dock">⚙</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Right Collapsible Slicer Dock -->
+    <aside id="slicer-dock" class="glass-popover slicer-dock" aria-label="Dilimleme Ayarları">
+      <div class="dock-tabs" role="tablist" aria-label="Ayar Sekmeleri">
+        <button class="dock-tab active" type="button" role="tab" aria-selected="true" data-tab="quality" data-i18n="tabQuality">Kalite</button>
+        <button class="dock-tab" type="button" role="tab" aria-selected="false" data-tab="infill" data-i18n="tabInfill">Dolgu &amp; Destek</button>
+        <button class="dock-tab" type="button" role="tab" aria-selected="false" data-tab="advanced" data-i18n="tabAdvanced">Gelişmiş</button>
+      </div>
+
+      <div class="dock-scroll">
+        <!-- TAB 1: Presets & Quality -->
+        <section id="panel-quality" class="tab-panel" role="tabpanel">
+          <h2 class="sec-title" data-i18n="secPresets">Yazıcı &amp; Profil</h2>
+          <div class="field-row">
+            <label for="cfg-printer" data-i18n="printer">Yazıcı</label>
+            <select id="cfg-printer" class="ctrl-select"></select>
+          </div>
+          <div class="field-row">
+            <label for="cfg-material" data-i18n="material">Malzeme</label>
+            <select id="cfg-material" class="ctrl-select"></select>
+          </div>
+          <div class="field-row">
+            <label for="cfg-quality" data-i18n="quality">Kalite Profili</label>
+            <select id="cfg-quality" class="ctrl-select"></select>
+          </div>
+
+          <div class="pop-divider"></div>
+          <h2 class="sec-title" data-i18n="secLayers">Katman &amp; Duvarlar</h2>
+
+          <div class="field-grid-2">
+            <div class="field-col">
+              <label for="cfg-layer-height" data-i18n="layerHeight">Katman Yüksekliği</label>
+              <input id="cfg-layer-height" class="ctrl-num mono" type="number" min="0.04" max="0.60" step="0.02" value="0.20" />
+            </div>
+            <div class="field-col">
+              <label for="cfg-first-layer" data-i18n="firstLayerHeight">İlk Katman</label>
+              <input id="cfg-first-layer" class="ctrl-num mono" type="number" min="0.08" max="0.60" step="0.02" value="0.24" />
+            </div>
+          </div>
+
+          <label class="toggle-row">
+            <input id="cfg-adaptive" type="checkbox" />
+            <span data-i18n="adaptiveLayers">Adaptif Katman (Dolenc-Mäkelä)</span>
+          </label>
+
+          <div class="field-grid-2">
+            <div class="field-col">
+              <label for="cfg-walls" data-i18n="wallCount">Duvar Sayısı</label>
+              <input id="cfg-walls" class="ctrl-num mono" type="number" min="1" max="10" step="1" value="3" />
+            </div>
+            <div class="field-col">
+              <label for="cfg-wall-order" data-i18n="wallOrder">Duvar Sırası</label>
+              <select id="cfg-wall-order" class="ctrl-select">
+                <option value="inner" data-i18n="orderInner">İçten Dışa</option>
+                <option value="outer" data-i18n="orderOuter">Dıştan İçe</option>
+              </select>
+            </div>
+          </div>
+
+          <label class="toggle-row">
+            <input id="cfg-arachne" type="checkbox" checked />
+            <span data-i18n="arachneThin">Arachne İnce Duvar &amp; Boşluk Dolgusu</span>
+          </label>
+          <label class="toggle-row">
+            <input id="cfg-vase" type="checkbox" />
+            <span data-i18n="spiralVase">Spiral Vazo Modu</span>
+          </label>
+        </section>
+
+        <!-- TAB 2: Infill, Surfaces, Support & Adhesion -->
+        <section id="panel-infill" class="tab-panel hidden" role="tabpanel">
+          <h2 class="sec-title" data-i18n="secInfill">İç Dolgu &amp; Yüzeyler</h2>
+          <div class="field-row">
+            <label for="cfg-infill-density"><span data-i18n="infillDensity">Doluluk Oranı</span> <strong id="lbl-infill-density" class="mono">20%</strong></label>
+            <input id="cfg-infill-density" class="ctrl-range" type="range" min="0" max="100" step="5" value="20" />
+          </div>
+          <div class="field-row">
+            <label for="cfg-infill-pattern" data-i18n="infillPattern">Dolgu Deseni</label>
+            <select id="cfg-infill-pattern" class="ctrl-select">
+              <option value="gyroid" selected>Gyroid (TPMS 3D)</option>
+              <option value="rectilinear">Rectilinear</option>
+              <option value="grid">Grid</option>
+              <option value="triangles">Triangles</option>
+              <option value="cubic">Cubic (3D)</option>
+              <option value="honeycomb">Honeycomb</option>
+              <option value="concentric">Concentric</option>
+              <option value="lightning">Lightning (Minimal)</option>
+            </select>
+          </div>
+          <div class="field-grid-2">
+            <div class="field-col">
+              <label for="cfg-top-layers" data-i18n="topLayers">Üst Katman</label>
+              <input id="cfg-top-layers" class="ctrl-num mono" type="number" min="0" max="15" value="4" />
+            </div>
+            <div class="field-col">
+              <label for="cfg-bottom-layers" data-i18n="bottomLayers">Alt Katman</label>
+              <input id="cfg-bottom-layers" class="ctrl-num mono" type="number" min="0" max="15" value="3" />
+            </div>
+          </div>
+          <label class="toggle-row">
+            <input id="cfg-monotonic" type="checkbox" checked />
+            <span data-i18n="monotonicTop">Monotonik Üst/Alt Yüzey</span>
+          </label>
+          <label class="toggle-row">
+            <input id="cfg-bridges" type="checkbox" checked />
+            <span data-i18n="detectBridges">Köprü Algılama &amp; Optimizasyon</span>
+          </label>
+          <label class="toggle-row">
+            <input id="cfg-ironing" type="checkbox" />
+            <span data-i18n="ironing">Üst Yüzey Ütüleme (Ironing)</span>
+          </label>
+
+          <div class="pop-divider"></div>
+          <h2 class="sec-title" data-i18n="secSupport">Destek Yapıları</h2>
+          <div class="field-row">
+            <label for="cfg-support-type" data-i18n="supportType">Destek Tipi</label>
+            <select id="cfg-support-type" class="ctrl-select">
+              <option value="none" data-i18n="supNone">Kapalı</option>
+              <option value="grid" data-i18n="supGrid">Normal Izgara (Grid)</option>
+              <option value="tree" data-i18n="supTree">Organik Ağaç (Tree)</option>
+            </select>
+          </div>
+          <div class="field-grid-2">
+            <div class="field-col">
+              <label for="cfg-support-angle" data-i18n="overhangAngle">Sarkma Açısı (°)</label>
+              <input id="cfg-support-angle" class="ctrl-num mono" type="number" min="20" max="75" value="50" />
+            </div>
+            <div class="field-col">
+              <label for="cfg-support-iface" data-i18n="supportInterface">Arayüz Katmanı</label>
+              <input id="cfg-support-iface" class="ctrl-num mono" type="number" min="0" max="5" value="2" />
+            </div>
+          </div>
+          <div class="field-row">
+            <label for="cfg-support-place" data-i18n="supportPlacement">Yerleşim</label>
+            <select id="cfg-support-place" class="ctrl-select">
+              <option value="bed" data-i18n="placeBedOnly">Yalnızca Tabla Üzerinden</option>
+              <option value="everywhere" data-i18n="placeEverywhere">Her Yerde</option>
+            </select>
+          </div>
+
+          <div class="pop-divider"></div>
+          <h2 class="sec-title" data-i18n="secAdhesion">Tabla Tutunması</h2>
+          <div class="field-row">
+            <label for="cfg-adhesion" data-i18n="adhesionType">Tutunma Tipi</label>
+            <select id="cfg-adhesion" class="ctrl-select">
+              <option value="skirt" selected data-i18n="adhSkirt">Etek (Skirt)</option>
+              <option value="brim" data-i18n="adhBrim">Brim (Kenarlık)</option>
+              <option value="raft" data-i18n="adhRaft">Raft (Tabanlık)</option>
+              <option value="none" data-i18n="adhNone">Yok</option>
+            </select>
+          </div>
+        </section>
+
+        <!-- TAB 3: Advanced, Seam, Kinematics & Transform -->
+        <section id="panel-advanced" class="tab-panel hidden" role="tabpanel">
+          <h2 class="sec-title" data-i18n="secTransform">Model Dönüşüm &amp; Yerleşim</h2>
+          <div class="field-grid-2">
+            <div class="field-col">
+              <label for="cfg-scale" data-i18n="scalePct">Ölçek (%)</label>
+              <input id="cfg-scale" class="ctrl-num mono" type="number" min="10" max="500" step="5" value="100" />
+            </div>
+            <div class="field-col">
+              <label for="cfg-copies" data-i18n="copies">Kopya Sayısı</label>
+              <input id="cfg-copies" class="ctrl-num mono" type="number" min="1" max="9" step="1" value="1" />
+            </div>
+          </div>
+          <div class="field-grid-3">
+            <div class="field-col">
+              <label for="cfg-rot-x" data-i18n="rotX">Döndür X</label>
+              <input id="cfg-rot-x" class="ctrl-num mono" type="number" min="-180" max="180" step="15" value="0" />
+            </div>
+            <div class="field-col">
+              <label for="cfg-rot-y" data-i18n="rotY">Döndür Y</label>
+              <input id="cfg-rot-y" class="ctrl-num mono" type="number" min="-180" max="180" step="15" value="0" />
+            </div>
+            <div class="field-col">
+              <label for="cfg-rot-z" data-i18n="rotZ">Döndür Z</label>
+              <input id="cfg-rot-z" class="ctrl-num mono" type="number" min="-180" max="180" step="15" value="0" />
+            </div>
+          </div>
+          <label class="toggle-row">
+            <input id="cfg-lay-flat" type="checkbox" />
+            <span data-i18n="layFlat">Düz Yatır</span>
+          </label>
+
+          <div class="pop-divider"></div>
+          <h2 class="sec-title" data-i18n="secSeamMotion">Dikiş, Hız &amp; Firmware</h2>
+          <div class="field-row">
+            <label for="cfg-seam" data-i18n="seamPos">Z-Dikiş Konumu</label>
+            <select id="cfg-seam" class="ctrl-select">
+              <option value="sharpest" selected>Sharpest Corner</option>
+              <option value="aligned">Aligned</option>
+              <option value="rear">Rear</option>
+              <option value="nearest">Nearest</option>
+              <option value="random">Random</option>
+            </select>
+          </div>
+          <label class="toggle-row">
+            <input id="cfg-scarf" type="checkbox" />
+            <span data-i18n="scarfSeam">Scarf Joint (Eğimli Dikiş)</span>
+          </label>
+          <label class="toggle-row">
+            <input id="cfg-combing" type="checkbox" checked />
+            <span data-i18n="combing">Combing (Duvar Geçmeme)</span>
+          </label>
+          <label class="toggle-row">
+            <input id="cfg-arcs" type="checkbox" checked />
+            <span data-i18n="arcFitting">G2/G3 Dairesel Yay Sığdırma</span>
+          </label>
+
+          <div class="field-grid-2">
+            <div class="field-col">
+              <label for="cfg-nozzle-temp" data-i18n="nozzleTemp">Nozul (°C)</label>
+              <input id="cfg-nozzle-temp" class="ctrl-num mono" type="number" min="150" max="320" value="210" />
+            </div>
+            <div class="field-col">
+              <label for="cfg-bed-temp" data-i18n="bedTemp">Tabla (°C)</label>
+              <input id="cfg-bed-temp" class="ctrl-num mono" type="number" min="0" max="125" value="60" />
+            </div>
+          </div>
+          <div class="field-grid-2">
+            <div class="field-col">
+              <label for="cfg-max-flow" data-i18n="maxFlow">Maks. Akış</label>
+              <input id="cfg-max-flow" class="ctrl-num mono" type="number" min="2" max="50" step="1" value="18" />
+            </div>
+            <div class="field-col">
+              <label for="cfg-flavor" data-i18n="flavor">G-Code Lehçesi</label>
+              <select id="cfg-flavor" class="ctrl-select">
+                <option value="marlin2">Marlin 2</option>
+                <option value="klipper">Klipper</option>
+                <option value="rrf">RepRapFirmware</option>
+                <option value="bambu">Bambu</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- Live Slice Telemetry Card (shown after slicing) -->
+        <section id="results-card" class="results-card hidden" aria-live="polite">
+          <div class="results-head">
+            <h2 class="sec-title" data-i18n="secResults">Dilimleme Sonucu</h2>
+            <span id="res-engine-ms" class="res-speed mono">—</span>
+          </div>
+          <div class="kpi-grid">
+            <div class="kpi-box">
+              <span class="kpi-label" data-i18n="printTime">Tahmini Süre</span>
+              <strong id="res-time" class="kpi-val mono">—</strong>
+            </div>
+            <div class="kpi-box">
+              <span class="kpi-label" data-i18n="filamentUsed">Filament</span>
+              <strong id="res-filament" class="kpi-val mono">—</strong>
+            </div>
+            <div class="kpi-box">
+              <span class="kpi-label" data-i18n="estCost">Tahmini Maliyet</span>
+              <strong id="res-cost" class="kpi-val mono">—</strong>
+            </div>
+            <div class="kpi-box">
+              <span class="kpi-label" data-i18n="sliceSpeed">Dilimleme Hızı</span>
+              <strong id="res-layers-moves" class="kpi-val mono">—</strong>
+            </div>
+          </div>
+          <div id="feature-bars" class="feature-bars"></div>
+        </section>
+      </div>
+
+      <!-- Dock Footer Actions -->
+      <div class="dock-footer">
+        <button id="btn-slice" class="primary-cta" type="button">
+          <span id="btn-slice-label" data-i18n="sliceNow">Dilimle</span>
+          <kbd class="cta-kbd">Ctrl+↵</kbd>
+        </button>
+        <div id="export-row" class="export-row hidden">
+          <button id="btn-export-gcode" class="secondary-cta" type="button" data-i18n="exportGcode">G-Code İndir</button>
+          <button id="btn-inspect-gcode" class="chip-btn" type="button" data-i18n="inspectGcode">G-Code İncele</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Preview Vertical Layer Scrubber (Left side of Dock) -->
+    <div id="layer-scrubber" class="glass-pill layer-scrubber hidden" role="region" aria-label="Katman Kaydırıcısı">
+      <div class="scrubber-readout mono">
+        <strong id="lbl-layer-num">0</strong>
+        <span id="lbl-layer-z">0.00 mm</span>
+      </div>
+      <input id="slider-layer" class="vertical-slider" type="range" min="0" max="1" value="1" aria-label="Aktif Katman" />
+      <div class="scrubber-btns">
+        <button id="btn-layer-up" class="mini-step" type="button" aria-label="Sonraki Katman">▲</button>
+        <button id="btn-layer-down" class="mini-step" type="button" aria-label="Önceki Katman">▼</button>
+      </div>
+    </div>
+
+    <!-- Bottom Floating Dock -->
+    <nav class="bottom-dock" aria-label="Görünüm ve Oynatma Kontrolleri">
+      <!-- Prepare Mode Tools -->
+      <div id="prepare-bar" class="glass-pill toolbar-pill">
+        <button id="btn-matcap" class="tool-btn" type="button" title="MatCap (M)">Clay</button>
+        <button id="btn-wire" class="tool-btn" type="button" aria-pressed="false" data-i18n="wireframe">Tel Kafes</button>
+        <button id="btn-overhang" class="tool-btn" type="button" aria-pressed="false" data-i18n="overhangView">Sarkma</button>
+        <span class="sep" aria-hidden="true"></span>
+        <button id="btn-view-iso" class="tool-btn mono" type="button" title="İzometrik (0)">ISO</button>
+        <button id="btn-view-top" class="tool-btn mono" type="button" title="Üstten (5)">TOP</button>
+        <button id="btn-view-front" class="tool-btn mono" type="button" title="Önden (1)">FRT</button>
+        <button id="btn-reset-cam" class="tool-btn" type="button" data-i18n="resetView">Sıfırla</button>
+      </div>
+
+      <!-- Preview Mode Toolhead Playback + Color Scheme + Legend -->
+      <div id="preview-bar" class="preview-stack hidden">
+        <div id="legend-pill" class="glass-pill legend-pill" aria-label="Özellik Renk Göstergesi"></div>
+        <div class="glass-pill playback-pill">
+          <button id="btn-play" class="chip-btn play-btn" type="button" aria-label="Oynat veya Duraklat (Boşluk)">▶</button>
+          <input id="slider-move" class="move-slider" type="range" min="0" max="1000" value="1000" aria-label="Katman İçi Nozul İlerlemesi" />
+          <span id="lbl-move-pct" class="mono move-pct">100%</span>
+          <span class="sep" aria-hidden="true"></span>
+          <label for="sel-color-mode" class="sr-only" data-i18n="colorBy">Renklendirme</label>
+          <select id="sel-color-mode" class="mini-select" aria-label="Renklendirme Modu">
+            <option value="0" data-i18n="colFeature">Özellik Tipi</option>
+            <option value="1" data-i18n="colSpeed">Hız (mm/s)</option>
+            <option value="2" data-i18n="colFlow">Akış (mm³/s)</option>
+            <option value="3" data-i18n="colWidth">Genişlik (Arachne)</option>
+            <option value="4" data-i18n="colHeight">Katman Yük.</option>
+          </select>
+          <button id="btn-travels" class="chip-btn" type="button" aria-pressed="false" data-i18n="showTravels">Boş Hareket</button>
+          <button id="btn-ghost" class="chip-btn" type="button" aria-pressed="false" data-i18n="ghostShell">Hayalet Model</button>
+          <button id="btn-nozzle" class="chip-btn active-chip" type="button" aria-pressed="true" data-i18n="showNozzle">Nozul</button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="glass-pill toast hidden" role="status" aria-live="polite"></div>
+  </div>
+
+  <!-- G-Code Inspector Modal -->
+  <div id="gcode-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="gcode-modal-title">
+    <div class="glass-popover gcode-modal-card">
+      <div class="modal-head">
+        <h2 id="gcode-modal-title" class="modal-title" data-i18n="gcodeTitle">G-Code İnceleyici</h2>
+        <div class="modal-actions">
+          <input id="gcode-search" class="text-input gcode-search" type="search" placeholder=";LAYER:10, G2…" aria-label="G-Code içinde ara" />
+          <button id="btn-gcode-copy" class="chip-btn" type="button" data-i18n="copy">Kopyala</button>
+          <button id="btn-gcode-close" class="chip-btn" type="button" data-i18n="close">Kapat</button>
+        </div>
+      </div>
+      <div id="gcode-meta" class="gcode-meta mono">—</div>
+      <pre id="gcode-viewer" class="gcode-code mono"></pre>
+    </div>
+  </div>
+
+  <input id="file-input" class="sr-only" type="file" accept=".stl,.obj,.zip,model/stl,application/octet-stream" aria-label="Upload 3D STL, OBJ, or ZIP file" />
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

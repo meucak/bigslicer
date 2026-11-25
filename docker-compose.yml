@@ -1,0 +1,29 @@
+services:
+  katman:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: katman
+    restart: unless-stopped
+    ports:
+      - "8098:8098"
+    mem_limit: 512m
+    cpus: 3.5
+    environment:
+      - PORT=8098
+      - NODE_ENV=production
+      - DOCS_DIR=/app/docs
+      - DATA_DIR=/app/server_data
+      - KATMAN_BIN=/usr/local/bin/katman
+      - LIBRARY_DIRS=SolidCraft=/library/solidcraft,KasaDepo=/library/depo
+    volumes:
+      - ./docs:/app/docs:ro
+      - ./server:/app/server:ro
+      - ./server_data:/app/server_data
+      - /home/kasa/apps/solidcraft-kasa/workspace:/library/solidcraft:ro
+      - /home/kasa/Depo:/library/depo:ro
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:8098/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 20s
+      timeout: 5s
+      retries: 3

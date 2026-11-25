@@ -1,0 +1,8 @@
+build/
+server_data/
+*.gcode
+*.ktp
+*.o
+*.a
+.DS_Store
+__pycache__/
