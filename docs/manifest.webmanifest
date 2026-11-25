@@ -1,6 +1,6 @@
 {
-  "name": "Katman — Ultra-Optimized 3D Slicer",
-  "short_name": "Katman",
+  "name": "BigSlicer — Ultra-Optimized 3D Slicer",
+  "short_name": "BigSlicer",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#0e1117",

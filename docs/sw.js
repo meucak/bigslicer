@@ -1,4 +1,4 @@
-const CACHE = 'katman-slicer-v1';
+const CACHE = 'bigslicer-v1';
 const ASSETS = ['./', './index.html', './style.css', './favicon.svg', './manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {

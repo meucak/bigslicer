@@ -197,7 +197,7 @@ export function createKatmanServer(options = {}) {
   const jobsDir = path.join(dataDir, 'jobs');
   fs.mkdirSync(jobsDir, { recursive: true });
 
-  const katmanBin = options.katmanBin || process.env.KATMAN_BIN || '/usr/local/bin/katman';
+  const katmanBin = options.katmanBin || process.env.BIGSLICER_BIN || process.env.KATMAN_BIN || '/usr/local/bin/bigslicer';
   const hasNative = fs.existsSync(katmanBin);
   const libraryDirs = options.libraryDirs || [];
   const maxStlBytes = options.maxStlBytes || 80 * 1024 * 1024;
@@ -335,7 +335,7 @@ export function createKatmanServer(options = {}) {
       if (pathname === '/api/health' && req.method === 'GET') {
         return sendJson(res, 200, {
           ok: true,
-          service: 'katman-slicer',
+          service: 'bigslicer',
           version: '1.0.0',
           nativeSlicer: hasNative,
           cpus: os.cpus().length,
@@ -412,7 +412,7 @@ export function createKatmanServer(options = {}) {
           });
           return res.end(buf);
         }
-        const dlName = sanitizeFilename(reqUrl.searchParams.get('name') || 'katman_output.gcode').replace(/\.stl$/i, '.gcode');
+        const dlName = sanitizeFilename(reqUrl.searchParams.get('name') || 'bigslicer_output.gcode').replace(/\.stl$/i, '.gcode');
         res.writeHead(200, {
           'Content-Type': 'text/plain; charset=utf-8',
           'Content-Length': st.size,
@@ -478,13 +478,14 @@ if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
       if (dir && fs.existsSync(dir.trim())) libDirs.push({ label: label.trim(), dir: dir.trim() });
     }
   }
+  const slicerBin = process.env.BIGSLICER_BIN || process.env.KATMAN_BIN || '/usr/local/bin/bigslicer';
   const server = createKatmanServer({
     docsDir: process.env.DOCS_DIR || path.join(__dirname, '..', 'docs'),
     dataDir: process.env.DATA_DIR || path.join(__dirname, '..', 'server_data'),
-    katmanBin: process.env.KATMAN_BIN || '/usr/local/bin/katman',
+    katmanBin: slicerBin,
     libraryDirs: libDirs,
   });
   server.listen(port, '0.0.0.0', () => {
-    console.log(`[katman] listening on http://0.0.0.0:${port} (native=${fs.existsSync(process.env.KATMAN_BIN || '/usr/local/bin/katman')}, libs=${libDirs.length})`);
+    console.log(`[bigslicer] listening on http://0.0.0.0:${port} (native=${fs.existsSync(slicerBin)}, libs=${libDirs.length})`);
   });
 }

@@ -1,7 +1,7 @@
 export const DICT = Object.freeze({
   tr: {
-    appTitle: 'Katman — Ultra Optimize 3D Dilimleyici',
-    srHeading: 'Katman 3D Baskı Dilimleyici ve Stüdyo',
+    appTitle: 'BigSlicer — Ultra Optimize 3D Dilimleyici',
+    srHeading: 'BigSlicer 3D Baskı Dilimleyici ve Stüdyo',
     modePrepare: 'Hazırla',
     modePreview: 'Önizleme',
     sliceNow: 'Dilimle',
@@ -93,8 +93,8 @@ export const DICT = Object.freeze({
     searchLayer: 'Katman veya komut ara (;LAYER:10, G2…)',
   },
   en: {
-    appTitle: 'Katman — Ultra-Optimized 3D Slicer',
-    srHeading: 'Katman 3D Printing Slicer and Studio',
+    appTitle: 'BigSlicer — Ultra-Optimized 3D Slicer',
+    srHeading: 'BigSlicer 3D Printing Slicer and Studio',
     modePrepare: 'Prepare',
     modePreview: 'Preview',
     sliceNow: 'Slice Model',

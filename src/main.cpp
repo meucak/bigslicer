@@ -19,9 +19,10 @@ namespace {
 
 void print_usage() {
     std::printf(
-        "katman 1.0.0 — Ultra-Optimized 3D Printing Slicer (C++20 / Clipper2 / Multi-Threaded)\n\n"
+        "BigSlicer 1.0.0 — Ultra-Optimized 3D Printing Slicer (C++20 / Clipper2 / Multi-Threaded)\n\n"
         "Usage:\n"
-        "  katman slice <model.stl|obj> -o <out.gcode> [options]\n"
+        "  bigslicer                       Launch BigSlicer 3D Studio (WebGL2)\n"
+        "  bigslicer slice <model.stl|obj> -o <out.gcode> [options]\n"
         "      --ktp <out.ktp>             Also write binary 3D toolpath stream\n"
         "      --stats-json <out.json>     Write detailed JSON stats & profiling\n"
         "      --config <file.json>        Load JSON slicer config\n"
@@ -43,11 +44,11 @@ void print_usage() {
         "      --flavor <fw>               marlin2|klipper|rrf|bambu\n"
         "      --threads <N>               Worker threads (0 = auto)\n"
         "      --no-gcode                  Skip G-code formatting (fast preview/bench)\n"
-        "  katman info <model.stl|obj>     Inspect mesh geometry, volume & overhangs\n"
-        "  katman bench <model.stl> [--runs N]  Benchmark full multi-threaded slicing pipeline\n"
-        "  katman profiles                 Print built-in printer/material/quality presets JSON\n"
-        "  katman view <model.stl>         Launch native OpenGL 3.3 3D STL + Toolpath Viewer\n"
-        "  katman --version | --help\n");
+        "  bigslicer info <model.stl|obj>  Inspect mesh geometry, volume & overhangs\n"
+        "  bigslicer bench <model.stl> [--runs N]  Benchmark full multi-threaded slicing pipeline\n"
+        "  bigslicer profiles              Print built-in printer/material/quality presets JSON\n"
+        "  bigslicer view <model.stl>      Launch native OpenGL 3.3 3D STL Viewer\n"
+        "  bigslicer --version | --help\n");
 }
 
 bool read_text_file(const std::string& path, std::string& out) {
@@ -200,7 +201,7 @@ int cmd_slice(const std::string& in_file,
         int mins = static_cast<int>(std::fmod(r.stats.print_time_sec, 3600.0) / 60.0);
         int secs = static_cast<int>(std::fmod(r.stats.print_time_sec, 60.0));
         std::printf(
-            "Katman sliced %s in %.2f ms (%u threads, %u cached layers)\n"
+            "BigSlicer sliced %s in %.2f ms (%u threads, %u cached layers)\n"
             "  Geometry : %u tris | %.1f x %.1f x %.1f mm | %u layers\n"
             "  Toolpath : %u moves (%u extrude, %u travel, %u arcs, %u retracts)\n"
             "  Print    : %dh %dm %ds | %.2f m (%.1f g) | max flow %.1f mm^3/s\n"
@@ -218,7 +219,7 @@ int cmd_slice(const std::string& in_file,
 
 int cmd_bench(const std::string& in_file, katman::SlicerConfig cfg, int runs) {
     if (in_file.empty()) {
-        std::fprintf(stderr, "Usage: katman bench <model.stl> [--runs N]\n");
+        std::fprintf(stderr, "Usage: bigslicer bench <model.stl> [--runs N]\n");
         return 1;
     }
     double min_ms = 1e9, sum_ms = 0.0, max_ms = 0.0;
@@ -261,7 +262,7 @@ int main(int argc, char** argv) {
         return 0;
     }
     if (std::strcmp(cmd, "--version") == 0 || std::strcmp(cmd, "-v") == 0) {
-        std::printf("katman 1.0.0 (C++20 / Clipper2 1.5.2 / Multi-Threaded)\n");
+        std::printf("bigslicer 1.0.0 (C++20 / Clipper2 1.5.2 / Multi-Threaded)\n");
         return 0;
     }
     if (std::strcmp(cmd, "profiles") == 0) {
@@ -274,7 +275,7 @@ int main(int argc, char** argv) {
     int bench_runs = 5;
 
     if (std::strcmp(cmd, "info") == 0) {
-        if (argc < 3) { std::fprintf(stderr, "Usage: katman info <model.stl>\n"); return 1; }
+        if (argc < 3) { std::fprintf(stderr, "Usage: bigslicer info <model.stl>\n"); return 1; }
         return cmd_info(argv[2]);
     }
     if (std::strcmp(cmd, "slice") == 0) {

@@ -271,7 +271,7 @@ bool X11GLWindow::open(const std::string& title, int width, int height, bool vsy
     // Class hints
     XClassHint* ch = XAllocClassHint();
     if (ch) {
-        char rn[] = "stlviewer";
+        char rn[] = "bigslicer";
         char rc[] = "StlViewer";
         ch->res_name = rn;
         ch->res_class = rc;
@@ -398,8 +398,8 @@ int X11GLWindow::connection_fd() const {
 int run_viewer(const std::string& initial_stl_path) {
     X11GLWindow win;
     std::string err;
-    if (!win.open("stlviewer", 1280, 720, true, err)) {
-        std::fprintf(stderr, "stlviewer error: %s\n", err.c_str());
+    if (!win.open("BigSlicer", 1280, 720, true, err)) {
+        std::fprintf(stderr, "bigslicer error: %s\n", err.c_str());
         return 1;
     }
 
@@ -458,7 +458,7 @@ int run_viewer(const std::string& initial_stl_path) {
         }
         update_sibling_info(mesh.path);
         watcher.watch_file(mesh.path);
-        win.set_title("stlviewer — " + base_name_of(mesh.path));
+        win.set_title("BigSlicer — " + base_name_of(mesh.path));
         renderer.reset_accumulation();
     };
 

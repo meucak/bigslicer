@@ -18,7 +18,7 @@ describe('KTP1 Binary Toolpath Decoder & Instanced Bead Geometry', () => {
   });
 
   it('decodes real C++20-generated KTP1 binary with exact layer spans & ranges', () => {
-    const katmanBin = process.env.KATMAN_BIN || '/src/build/katman';
+    const katmanBin = process.env.BIGSLICER_BIN || process.env.KATMAN_BIN || '/src/build/bigslicer';
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ktp-test-'));
     try {
       // Build tiny binary cube STL

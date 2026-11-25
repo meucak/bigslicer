@@ -134,7 +134,7 @@ function initRenderer() {
     renderer.init(w, h, dpr);
     renderer.setTargetSamples(8);
   } catch (e2) {
-    console.warn('[katman] WebGL2 init fallback:', e2?.message || e2);
+    console.warn('[bigslicer] WebGL2 init fallback:', e2?.message || e2);
     try {
       renderer = new RendererWebGL1(canvas);
       renderer.init(w, h, dpr);

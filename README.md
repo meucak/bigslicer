@@ -1,6 +1,6 @@
-# Katman — Ultra-Optimized C++20 / Clipper2 3D Printing Slicer & WebGL2 Studio
+# BigSlicer — Ultra-Optimized C++20 / Clipper2 3D Printing Slicer & WebGL2 Studio
 
-**Katman** is a from-scratch, zero-bloat, multi-threaded 3D printing slicer engineered for extreme slicing speed, physical G-code accuracy, and dual **Native + Browser** operation:
+**BigSlicer** is a from-scratch, zero-bloat, multi-threaded 3D printing slicer engineered for extreme slicing speed, physical G-code accuracy, and dual **Native + Browser** operation:
 
 - **Native C++20 Engine + Integrated OpenGL 3.3 Core Viewer** (`739 KB` stripped binary, `-O3 -flto -fno-exceptions -fno-rtti`, `Clipper2 1.5.2`)
 - **Offline WebAssembly C++20 Build** (`308 KB` `.wasm` + `12 KB` JS loader — runs 100% client-side in Web Workers, zero server required)
@@ -31,7 +31,7 @@ Measured on a 2011 **Intel Core i5-2300** (4 cores, 2.8 GHz Sandy Bridge, local 
 
 ## Core Slicing Engine Architecture
 
-Katman synthesizes the strongest architectural ideas from **PrusaSlicer/Slic3r**, **CuraEngine 5+ (Arachne)**, and **OrcaSlicer** into a clean, cache-friendly C++20 pipeline:
+BigSlicer synthesizes the strongest architectural ideas from **PrusaSlicer/Slic3r**, **CuraEngine 5+ (Arachne)**, and **OrcaSlicer** into a clean, cache-friendly C++20 pipeline:
 
 1. **Zero-Copy Mesh Ingestion (`src/core/mesh.*`)**
    - Binary STL (with `solid`-header binary trap protection), ASCII STL, and Wavefront OBJ.
@@ -71,7 +71,25 @@ Katman synthesizes the strongest architectural ideas from **PrusaSlicer/Slic3r**
 
 ## Quick Start
 
-### 1. Docker Web Studio + Native C++20 API (Port `8098`)
+### 1. Terminal Command (`bigslicer`)
+
+```bash
+# Open BigSlicer 3D Studio window directly
+bigslicer
+
+# Slice an STL to G-code via native C++20 engine
+bigslicer slice model.stl -o model.gcode \
+  --printer prusa_mk4s --material pla --quality standard_020 \
+  --pattern gyroid --infill 20 --support tree
+
+# Open native OpenGL 3.3 Core 3D viewer
+bigslicer view model.stl
+
+# Benchmark any STL
+bigslicer bench model.stl --pattern gyroid --runs 5
+```
+
+### 2. Docker Web Studio + Native C++20 API (Port `8098`)
 
 ```bash
 docker compose up -d --build
@@ -83,64 +101,42 @@ Check health:
 curl http://127.0.0.1:8098/api/health
 ```
 
-### 2. Native CLI & Integrated OpenGL 3.3 Viewer
+### 3. Native Build & Offline WebAssembly Build
 
-Build inside Docker (leaves host clean) and run directly on Linux:
 ```bash
+# Build native binary + tests + bench inside Docker
 ./build.sh
-./build/katman --version
-./build/katman profiles
 
-# Slice an STL to G-code with Prusa MK4S + PLA + Gyroid + Tree Supports
-./build/katman slice model.stl -o model.gcode \
-  --printer prusa_mk4s --material pla --quality standard_020 \
-  --infill-pattern gyroid --infill 20 --support tree
-
-# Open interactive OpenGL 3.3 Core 3D viewer (reused from stlviewer)
-./build/katman view model.stl
-
-# Benchmark any STL
-./build/katman bench model.stl --infill-pattern gyroid --runs 5
-```
-
-### 3. Offline WebAssembly Build (GitHub Pages / PWA)
-
-```bash
+# Build 308 KB Emscripten WASM for offline PWA / GitHub Pages
 ./build_wasm.sh
-# Outputs docs/wasm/katman_wasm.wasm (308 KB) & docs/wasm/katman_wasm.js (12 KB)
 ```
 
-Serve `docs/` on any static host (or open [GitHub Pages](https://meucak.github.io/katman/)) — when `/api/health` is absent, the studio seamlessly runs the exact same C++20 engine inside a browser Web Worker via WebAssembly.
+Serve `docs/` on any static host (or open [GitHub Pages](https://meucak.github.io/bigslicer/)) — when `/api/health` is absent, BigSlicer seamlessly runs the exact same C++20 engine inside a browser Web Worker via WebAssembly.
 
 ---
 
 ## Verification & Test Suite
 
-- **C++20 Unit & Real-STL E2E (`91/91 passed`):**
-  ```bash
-  ./build/katman_tests
-  ./build/katman_bench
-  ```
-  Covers binary/ASCII STL & OBJ, inverted-normal repair, exact slice areas, PolyTree holes, Dolenc–Mäkelä adaptive layers, cracked non-manifold stitching, Slic3r pill flow math, Arachne thin fins, all 8 infill patterns, Spiral Vase helical Z, ironing, bridges, Grid & Organic Tree supports, G2/G3 arcs, scarf seams, volumetric capping, cooling slowdown, brim/raft, all 4 firmware flavors, M82/M83 extrusion conservation, and **1T == 4T bit-identical G-code determinism**.
+- **C++20 Unit & Real-STL E2E (`91/91 passed`):** `./build/katman_tests` & `./build/katman_bench`
 - **Node.js Server API, `KTP1` Decoder & Security (`8/8 passed`):**
   ```bash
-  docker run --rm --entrypoint node -e KATMAN_BIN=/usr/local/bin/katman \
-    -v "$PWD/tests:/app/tests:ro" katman-katman:latest \
+  docker run --rm --entrypoint node -e BIGSLICER_BIN=/usr/local/bin/bigslicer \
+    -v "$PWD/tests:/app/tests:ro" bigslicer-bigslicer:latest \
     --test /app/tests/web/test_toolpath_decoder.mjs /app/tests/server/test_server.mjs
   ```
 - **Headless Chromium True WebGL2 + `axe-core` WCAG AA + Offline WASM E2E (`100% passed`):**
-  Verifies true `WebGL2` instanced rendering, **0 `axe-core` WCAG AA violations** across Prepare Dark, Prepare Light, and Preview modes, Native C++20 Gyroid & Tree Support slicing, G-code Inspector search, and Offline WASM Worker fallback.
+  True `WebGL2` instanced rendering, **0 `axe-core` WCAG AA violations** across Prepare Dark, Prepare Light, and Preview modes, Native C++20 Gyroid & Organic Tree Supports, G-code Inspector search, and Offline WASM Worker fallback.
 
 ---
 
 ## Project Structure
 
 ```text
-katman/
+bigslicer/
 ├── src/
 │   ├── core/          # C++20 multi-threaded slicer engine (13 modules)
 │   ├── viewer/        # Integrated bare-metal OpenGL 3.3 Core STL viewer
-│   ├── wasm/          # Emscripten C++20 -> WebAssembly bridge
+│   ├── wasm_api.cpp   # Emscripten C++20 -> WebAssembly bridge
 │   └── main.cpp       # Unified CLI (slice / view / bench / info / profiles)
 ├── third_party/
 │   └── clipper2/      # Official AngusJohnson/Clipper2 1.5.2 (Boost-1.0)
